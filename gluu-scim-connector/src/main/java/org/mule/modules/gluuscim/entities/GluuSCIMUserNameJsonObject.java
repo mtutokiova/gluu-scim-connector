@@ -4,7 +4,7 @@ import java.io.Serializable;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-public class GluuSCIMUserObjectName implements Serializable {
+public class GluuSCIMUserNameJsonObject implements Serializable {
 
 	private static final long serialVersionUID = -4516775913592052601L;
 	

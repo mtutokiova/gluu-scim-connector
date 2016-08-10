@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 
 import org.apache.commons.codec.binary.Base64;
@@ -19,21 +20,25 @@ import org.mule.modules.gluuscim.entities.GluuSCIMGetAuthorizedTokenJsonRequest;
 import org.mule.modules.gluuscim.entities.GluuSCIMGetAuthorizedTokenJsonResponse;
 import org.mule.modules.gluuscim.entities.GluuSCIMGetTicketJsonResponse;
 import org.mule.modules.gluuscim.entities.GluuSCIMGetTokenJsonResponse;
-import org.mule.modules.gluuscim.entities.GluuSCIMPutUserJsonRequest;
-import org.mule.modules.gluuscim.entities.GluuSCIMUserExtension;
-import org.mule.modules.gluuscim.entities.GluuSCIMUserObjectName;
+import org.mule.modules.gluuscim.entities.GluuSCIMGetUserJsonRequest;
+import org.mule.modules.gluuscim.entities.GluuSCIMUserJsonRequest;
+import org.mule.modules.gluuscim.entities.GluuSCIMUserNameJsonObject;
 import org.mule.modules.gluuscim.exception.GluuSCIMConnectorException;
 import org.mule.modules.gluuscim.exception.GluuSCIMServerErrorException;
 import org.mule.util.store.PartitionedPersistentObjectStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.web.bind.annotation.RequestMethod;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.net.MediaType;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
+import com.sun.jersey.api.client.WebResource.Builder;
 import com.sun.jersey.api.client.config.ClientConfig;
 import com.sun.jersey.api.client.config.DefaultClientConfig;
 import com.sun.jersey.api.json.JSONConfiguration;
@@ -47,33 +52,35 @@ import com.sun.jersey.core.util.MultivaluedMapImpl;
 
 public class GluuSCIMClient {
 
-	private static final String APPLICATION_JSON = "application/json";
-	private static final String APPLICATION_X_WWW_FORM_URLENCODED = "application/x-www-form-urlencoded";
-	private static final String CONTENT_TYPE = "Content-Type";
 	private static final String GET_AAT_TOKEN = "oxauth/seam/resource/restv1/oxauth/token";
 	private static final String GET_SCIM_TOKEN = "oxauth/seam/resource/restv1/requester/rpt";
 	private static final String AUTHORIZE_SCIM_TOKEN = "oxauth/seam/resource/restv1/requester/perm";
-	private static final String GET_USER = "identity/seam/resource/restv1/scim/v2/Users/@!E0E2.8150.B9D2.14A0!0001!6A42.EB0A!0000!236E.FBB7";
+	private static final String SEARCH_USER = "identity/seam/resource/restv1/scim/v2/Users/Search";
+	private static final String USER_ENDPOINT = "identity/seam/resource/restv1/scim/v2/Users";
 	
 	private static final String AAT_TOKEN = "aatToken";
 	private static final String AAT_REFRESH_TOKEN = "aatRefreshToken";
 	private static final String AUTHORIZATION = "Authorization";
 	private static final String BEARER = "Bearer ";
 	private static final String BASIC = "Basic ";
-	private static final ObjectMapper JSON_OBJECT_MAPPER = new ObjectMapper();
 	
+	private static final String USER_EXTENSION_SCHEMA = "urn:ietf:params:scim:schemas:extension:gluu:2.0:User";
+	private static final String USER_CORE_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:User";
+	private static final String DEFAULT_USER_OBJECT_STORE = "_defaultUserObjectStore";
+	private static final String CONTENT_TYPE = "Content-Type";
 
-//	private PartitionedPersistentObjectStore<Serializable> objectStore;
-	private TestObjectStore objectStore;
+	private static final ObjectMapper JSON_OBJECT_MAPPER = new ObjectMapper();
+	private transient final Logger LOGGER = LoggerFactory.getLogger(this.getClass());
 	
 	// set initial token expiration time to past date
 	private static long AAT_TOKEN_EXPIRATION_TIME = System.currentTimeMillis()/1000 - 5000;
-	
-	private transient final Logger LOGGER = LoggerFactory.getLogger(this.getClass());
 
 	private final Client client;
 	private final WebResource apiResource;
 	private final GluuSCIMConnectorConfig connectorConfig;
+
+	private PartitionedPersistentObjectStore<Serializable> objectStore;
+//	private TestObjectStore objectStore;
 	
 	/**
 	 * Constructor - Setup Jersey Client and WebResource objects
@@ -90,85 +97,85 @@ public class GluuSCIMClient {
 	}
 	
 	/** Returns response from the get user call */
-	public String getUser(/*MuleEvent event*/ TestObjectStore objectStore) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
-		String authorizedScimToken = obtainToken(objectStore, null);
+	public String getUser(MuleEvent event /*TestObjectStore objectStore*/, String attribute, String value) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
+		this.objectStore = event.getMuleContext().getRegistry().lookupObject(DEFAULT_USER_OBJECT_STORE);
+//		this.objectStore = objectStore;
 		
-		System.out.println(String.format("Sending request to %s with authorized SCIM token %s in header", apiResource + "/" + GET_USER, authorizedScimToken));
-		LOGGER.info(String.format("Sending request to %s with authorized SCIM token %s in header", apiResource + "/" + GET_USER, authorizedScimToken));
+		GluuSCIMGetUserJsonRequest request = new GluuSCIMGetUserJsonRequest();
+		request.setAttribute(attribute);
+		request.setValue(value);
 		
-		String responseString = getValidatedResponse(apiResource
-				.path(GET_USER)
-				.accept("application/scim+json")
-				.header("Content-Type", "application/scim+json")
-				.header(AUTHORIZATION, authorizedScimToken)
-				.get(ClientResponse.class));
-		
-		return responseString;
-		
-//		try {
-//			return jsonObjectMapper.readValue(responseString, GluuSCIMGetTicketJsonResponse.class).getScimTicket();
-//		} catch (IOException e) {
-//			throw new GluuSCIMConnectorException(e.getMessage());
-//		}
-		
-	}
-	
-	/** Returns response from the create user call */
-	public String createUser(/*MuleEvent event*/ TestObjectStore objectStore) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
-		
-		GluuSCIMUserObjectName name = new GluuSCIMUserObjectName();
-		name.setFamilyName("myTestingFamilyName");
-		name.setGivenName("myTestingGivenName");
-		
-		GluuSCIMUserExtension userExtension = new GluuSCIMUserExtension();
-		userExtension.setPrintPlusDigital(new String[]{"abc", "def"});
-		
-		GluuSCIMPutUserJsonRequest request = new GluuSCIMPutUserJsonRequest();
-		request.setSchemas(new String[]{"urn:ietf:params:scim:schemas:core:2.0:User",
-				 "urn:ietf:params:scim:schemas:extension:gluu:2.0:User"});
-		request.setName(name);
-//		user.setUserName("myTestingName@example.com");
-		request.setUserExtension(userExtension);
-
 		String jsonRequest = null;
 		try {
 			jsonRequest = JSON_OBJECT_MAPPER.writeValueAsString(request);
 		} catch (JsonProcessingException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
+			throw new GluuSCIMConnectorException(e1.getMessage());
 		}
 		
-		String authorizedScimToken = obtainToken(objectStore, jsonRequest);
+		String authorizedScimToken = obtainToken(RequestMethod.POST, SEARCH_USER, jsonRequest);
 		
+		System.out.println(String.format("Sending request to %s with authorized SCIM token %s in header", apiResource + "/" + SEARCH_USER, authorizedScimToken));
+		LOGGER.info(String.format("Sending request to %s with authorized SCIM token %s in header", apiResource + "/" + SEARCH_USER, authorizedScimToken));
 		
-		System.out.println(String.format("Sending request to %s with authorized SCIM token %s in header", apiResource + "/" + GET_USER, authorizedScimToken));
-		LOGGER.info(String.format("Sending request to %s with authorized SCIM token %s in header", apiResource + "/" + GET_USER, authorizedScimToken));
-		
-		String responseString = getValidatedResponse(apiResource
-				.path(GET_USER)
-//				.accept("application/json")
-				.header(CONTENT_TYPE, APPLICATION_JSON)
+		return getValidatedResponse(apiResource
+				.path(SEARCH_USER)
+				.accept(MediaType.APPLICATION_JSON)
+				.header(CONTENT_TYPE, MediaType.APPLICATION_JSON)
 				.header(AUTHORIZATION, authorizedScimToken)
-				.put(ClientResponse.class, jsonRequest));
+				.type(MediaType.APPLICATION_JSON)
+				.post(ClientResponse.class, jsonRequest));
+	}
+	
+	/** Returns response from the create user call */
+	public String createUser(MuleEvent event /*TestObjectStore objectStore*/, String firstName, String lastName, String displayName, String email, String password, JsonNode entitlements) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
+		this.objectStore = event.getMuleContext().getRegistry().lookupObject(DEFAULT_USER_OBJECT_STORE);
+//		this.objectStore = objectStore;
 		
-		return responseString;
+		String jsonRequest = getUserJsonRequest(firstName, lastName, displayName, email, password, entitlements);
 		
-//		try {
-//			return jsonObjectMapper.readValue(responseString, GluuSCIMGetTicketJsonResponse.class).getScimTicket();
-//		} catch (IOException e) {
-//			throw new GluuSCIMConnectorException(e.getMessage());
-//		}
+		
+		String authorizedScimToken = obtainToken(RequestMethod.POST, USER_ENDPOINT, jsonRequest);
+		
+		System.out.println(String.format("Sending request to %s with authorized SCIM token %s in header", apiResource + "/" + SEARCH_USER, authorizedScimToken));
+		LOGGER.info(String.format("Sending request to %s with authorized SCIM token %s in header", apiResource + "/" + SEARCH_USER, authorizedScimToken));
+		
+		return getValidatedResponse(apiResource
+				.path(USER_ENDPOINT)
+				.accept(MediaType.APPLICATION_JSON)
+				.header(CONTENT_TYPE, MediaType.APPLICATION_JSON)
+				.header(AUTHORIZATION, authorizedScimToken)
+				.post(ClientResponse.class, jsonRequest));
 		
 	}
+
+	/** Returns response from the update user call */
+	public String updateUser(MuleEvent event /*TestObjectStore objectStore*/, String gluuId, String firstName, String lastName, String displayName, String email, String password, JsonNode entitlements) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
+		this.objectStore = event.getMuleContext().getRegistry().lookupObject(DEFAULT_USER_OBJECT_STORE);
+//		this.objectStore = objectStore;
+		
+		String url = USER_ENDPOINT + "/" + gluuId;
+
+		String jsonRequest = getUserJsonRequest(firstName, lastName, displayName, email, password, entitlements);
+		String authorizedScimToken = obtainToken(RequestMethod.PUT, url, jsonRequest);
+		
+		System.out.println(String.format("Sending request to %s with authorized SCIM token %s in header", apiResource + "/" + url, authorizedScimToken));
+		LOGGER.info(String.format("Sending request to %s with authorized SCIM token %s in header", apiResource + "/" + url, authorizedScimToken));
+		
+		return getValidatedResponse(apiResource
+				.path(url)
+				.accept(MediaType.APPLICATION_JSON)
+				.header(CONTENT_TYPE, MediaType.APPLICATION_JSON)
+				.header(AUTHORIZATION, authorizedScimToken)
+				.put(ClientResponse.class, jsonRequest));
+	}
+
 
 	/////////////
 	/// UTILS ///
 	/////////////
 	
 	/** Do all the steps required to obtain a valid scim access token including refresh token if needed */
-	private String obtainToken(TestObjectStore objectStore, String jsonRequest) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
-//		this.objectStore = event.getMuleContext().getRegistry().lookupObject("_defaultUserObjectStore");
-		this.objectStore = objectStore;
+	private String obtainToken(RequestMethod requestMethod, String url, String jsonRequest) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
 		
 		// do refresh token a minute before token expires
 		if (AAT_TOKEN_EXPIRATION_TIME < System.currentTimeMillis()/1000 + 60) {
@@ -183,7 +190,7 @@ public class GluuSCIMClient {
 			e.printStackTrace();
 		}
 		String scimToken = getScimToken(BEARER + aatToken);
-		String scimTicket = getScimTicket(BEARER + scimToken, jsonRequest);
+		String scimTicket = getScimTicket(requestMethod, url, BEARER + scimToken, jsonRequest);
 		
 		return BEARER + getAuthorizedScimToken(BEARER + aatToken, scimToken, scimTicket, getApiUrl());
 	}
@@ -213,7 +220,7 @@ public class GluuSCIMClient {
 		String responseString = getValidatedResponse(apiResource
 				.path(GET_AAT_TOKEN)
 				.header(AUTHORIZATION, authStringEncrypted)
-				.header(CONTENT_TYPE, APPLICATION_X_WWW_FORM_URLENCODED)
+				.header(CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED_TYPE)
 				.post(ClientResponse.class, formData));
 		
 		try {
@@ -251,17 +258,30 @@ public class GluuSCIMClient {
 	}
 	
 	/** Returns response from the "identity/seam/resource/restv1/scim/v2/Users/" call */
-	private String getScimTicket(String scimToken, String jsonRequest) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
+	private String getScimTicket(RequestMethod requestMethod, String url, String scimToken, String jsonRequest) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
+		System.out.println(String.format("Sending request to %s with SCIM token %s in header and request %s", apiResource + "/" + SEARCH_USER, scimToken, jsonRequest));
+		LOGGER.info(String.format("Sending request to %s with SCIM token %s in header and request %s", apiResource + "/" + SEARCH_USER, scimToken, jsonRequest));
 		
-		System.out.println(String.format("Sending request to %s with SCIM token %s in header and request %s", apiResource + "/" + GET_USER, scimToken, jsonRequest));
-		LOGGER.info(String.format("Sending request to %s with SCIM token %s in header and request %s", apiResource + "/" + GET_USER, scimToken, jsonRequest));
-		
-		String responseString = getValidatedResponse(apiResource
-				.path(GET_USER)
-//				.accept("application/json")
-				.header(CONTENT_TYPE, APPLICATION_JSON)
+		Builder requestBuilder = apiResource
+				.path(url)
+				.accept(MediaType.APPLICATION_JSON)
+				.header(CONTENT_TYPE, MediaType.APPLICATION_JSON)
 				.header(AUTHORIZATION, scimToken)
-				.put(ClientResponse.class, jsonRequest));
+				.type(MediaType.APPLICATION_JSON);
+		
+		ClientResponse response = null;
+		
+		switch (requestMethod) {
+		case POST:
+			response = requestBuilder.post(ClientResponse.class, jsonRequest);
+			break;
+		case PUT:
+			response = requestBuilder.put(ClientResponse.class, jsonRequest);
+		default:
+			break;
+		}
+		
+		String responseString = getValidatedResponse(response);
 		
 		try {
 			return JSON_OBJECT_MAPPER.readValue(responseString, GluuSCIMGetTicketJsonResponse.class).getScimTicket();
@@ -287,7 +307,7 @@ public class GluuSCIMClient {
 			String responseString = getValidatedResponse(apiResource
 					.path(AUTHORIZE_SCIM_TOKEN)
 					.header(AUTHORIZATION, aatToken)
-					.header(CONTENT_TYPE, APPLICATION_JSON)
+					.header(CONTENT_TYPE, MediaType.APPLICATION_JSON)
 					.post(ClientResponse.class, jsonRequest));
 			
 			return JSON_OBJECT_MAPPER.readValue(responseString, GluuSCIMGetAuthorizedTokenJsonResponse.class).getAuthorizedToken();
@@ -296,6 +316,37 @@ public class GluuSCIMClient {
 			throw new GluuSCIMConnectorException(e.getMessage());
 		}
 	}
+	
+	private String getUserJsonRequest(String firstName, String lastName,
+			String displayName, String email, String password,
+			JsonNode entitlements) throws GluuSCIMConnectorException {
+		String[] schemas = new String[2];
+		schemas[0] = USER_CORE_SCHEMA;
+		if (entitlements != null) {
+			schemas[1] = USER_EXTENSION_SCHEMA;
+		}
+		
+		GluuSCIMUserNameJsonObject name = new GluuSCIMUserNameJsonObject();
+		name.setFamilyName(lastName);
+		name.setGivenName(firstName);
+		
+		GluuSCIMUserJsonRequest request = new GluuSCIMUserJsonRequest();
+		request.setSchemas(schemas);
+		request.setUserName(email);
+		request.setName(name);
+		request.setDisplayName(displayName);
+		request.setPassword(password);
+		request.setUserExtension(entitlements);
+
+		String jsonRequest = null;
+		try {
+			jsonRequest = JSON_OBJECT_MAPPER.writeValueAsString(request);
+		} catch (JsonProcessingException e1) {
+			throw new GluuSCIMConnectorException(e1.getMessage());
+		}
+		return jsonRequest;
+	}
+	
 	
 	/** Returns the response string in case of valid response or throws an exception in case of invalid response */
 	private String getValidatedResponse(ClientResponse clientResponse) throws GluuSCIMConnectorException, GluuSCIMServerErrorException {
@@ -307,10 +358,9 @@ public class GluuSCIMClient {
 		
 		if(responseStatus == 500 ){
 			throw new GluuSCIMServerErrorException();
+		} else if(responseStatus != 200 && responseStatus != 201 && responseStatus != 403){
+			throw new GluuSCIMConnectorException(responseEntity);
 		}
-//		} else if(responseStatus != 200 && responseStatus != 201){
-//			throw new GluuSCIMConnectorException(responseEntity);
-//		}
 		return responseEntity;
 	}
 	
@@ -340,13 +390,29 @@ public class GluuSCIMClient {
 	public static void main(String[] args) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
 		GluuSCIMConnectorConfig connectorConfig = new GluuSCIMConnectorConfig();
 		connectorConfig.setHost("idp.d.aws.economist.com");
-		connectorConfig.setAatRefreshToken("e6dc3ff2-66a7-49ea-9806-6d4151d18d9a");
-		connectorConfig.setUsername("@!E0E2.8150.B9D2.14A0!0001!6A42.EB0A!0008!F439.0592");
-		connectorConfig.setPassword("1cdb3c2e-15d0-47ab-a8c5-a3bce017026e");
+		connectorConfig.setAatRefreshToken("2de26069-06d6-4b38-b7fd-74b5de34b6d0");
+		connectorConfig.setUsername("@!E0E2.8150.B9D2.14A0!0001!6A42.EB0A!0008!C1BA.E22F");
+		connectorConfig.setPassword("5ab8e319-b4d4-4808-b06d-583bb109ca90");
 		connectorConfig.setRedirectUri("https://dev-economistapi.cloudhub.io");
 		
 		GluuSCIMClient client = new GluuSCIMClient(connectorConfig);
-		System.out.println(client.createUser(client.new TestObjectStore()));
+//		System.out.println(client.getUser(client.new TestObjectStore(), "uid", "guest-ajamnssi@example.com"));
+		
+		ObjectNode printPlusWebSubNode = JSON_OBJECT_MAPPER.createObjectNode();
+		printPlusWebSubNode.put("product", "Print + Web");
+		printPlusWebSubNode.put("entitlementStartDate", "1469051438");
+		printPlusWebSubNode.put("entitlementEndDate", "1500508800");
+		
+		ObjectNode printPlusWebNode = JSON_OBJECT_MAPPER.createObjectNode();
+		printPlusWebNode.put("Print + Web", printPlusWebSubNode);
+		
+		ArrayNode printPlusWebMainNode = JSON_OBJECT_MAPPER.createArrayNode();
+		printPlusWebMainNode.add(printPlusWebNode.toString());
+		
+		ObjectNode entitlements = JSON_OBJECT_MAPPER.createObjectNode();
+		entitlements.put("printPlusWeb", printPlusWebMainNode);
+		
+//		System.out.println(client.updateUser(client.new TestObjectStore(), "@!E0E2.8150.B9D2.14A0!0001!6A42.EB0A!0000!C9A3.6E92", "Tina", "Turner", "fancydisplayName", "email44@test.com_edited", "password55_edited", entitlements));
 	}
 	
 	public class TestObjectStore {

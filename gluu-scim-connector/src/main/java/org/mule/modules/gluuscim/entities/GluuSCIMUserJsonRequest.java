@@ -2,9 +2,12 @@ package org.mule.modules.gluuscim.entities;
 
 import java.io.Serializable;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 
+@JsonInclude(Include.NON_NULL)
 public class GluuSCIMUserJsonRequest implements Serializable{
 
 	private static final long serialVersionUID = -3245741686775688146L;

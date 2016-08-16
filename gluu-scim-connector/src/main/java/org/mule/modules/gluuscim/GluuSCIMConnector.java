@@ -1,12 +1,17 @@
 package org.mule.modules.gluuscim;
 
+import java.util.List;
+
 import org.mule.api.MuleEvent;
 import org.mule.api.annotations.Config;
 import org.mule.api.annotations.Connector;
 import org.mule.api.annotations.Processor;
 import org.mule.api.annotations.lifecycle.Start;
+import org.mule.api.annotations.param.Optional;
 import org.mule.modules.gluuscim.client.GluuSCIMClient;
 import org.mule.modules.gluuscim.config.GluuSCIMConnectorConfig;
+import org.mule.modules.gluuscim.entities.GluuSCIMEntitlement;
+import org.mule.modules.gluuscim.entities.GluuSCIMUser;
 import org.mule.modules.gluuscim.exception.GluuSCIMConnectorException;
 import org.mule.modules.gluuscim.exception.GluuSCIMServerErrorException;
 
@@ -43,37 +48,25 @@ public class GluuSCIMConnector {
     /**
      * Creates user in gluu
      *
-     * @param firstName - First Name
-     * @param lastName - Last Name
-     * @param displayName - Display Name (e.g. First Name + Last Name)
-     * @param email - Email
-     * @param password - Password
-     * @param entitlements - Products which users is subscribed to in json format e.g. {"printPlusWeb":["{\"Print + Web\":{\"product\":\"Print + Web\",\"entitlementStartDate\":\"1469051438\",\"entitlementEndDate\":\"1500508800\"}}"]}
      * @return Gluu User
      * @throws GluuSCIMConnectorException 
      * @throws GluuSCIMServerErrorException 
      */
     @Processor
-    public String createUser(MuleEvent event, String firstName, String lastName, String displayName, String email, String password, JsonNode entitlements) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
-        return client.createUser(event, firstName, lastName, displayName, email, password, entitlements);
+    public String createUser(MuleEvent event, GluuSCIMUser user) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
+        return client.createUser(event, user);
     }
     
     /**
      * Updates user in gluu
      *
-     * @param firstName - First Name
-     * @param lastName - Last Name
-     * @param displayName - Display Name (e.g. First Name + Last Name)
-     * @param email - Email
-     * @param password - Password
-     * @param entitlements - Products which users is subscribed to in json format e.g. {"printPlusWeb":["{\"Print + Web\":{\"product\":\"Print + Web\",\"entitlementStartDate\":\"1469051438\",\"entitlementEndDate\":\"1500508800\"}}"]}
      * @return Gluu User
      * @throws GluuSCIMConnectorException 
      * @throws GluuSCIMServerErrorException 
      */
     @Processor
-    public String updateUser(MuleEvent event, String gluuId, String firstName, String lastName, String displayName, String email, String password, JsonNode entitlements) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
-        return client.updateUser(event, gluuId, firstName, lastName, displayName, email, password, entitlements);
+    public String updateUser(MuleEvent event, GluuSCIMUser user) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
+        return client.updateUser(event, user);
     }
 
     public GluuSCIMConnectorConfig getConfig() {

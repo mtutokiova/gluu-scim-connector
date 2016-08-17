@@ -3,7 +3,6 @@ package org.mule.modules.gluuscim.client;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -34,7 +33,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.RequestMethod;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -324,42 +322,17 @@ public class GluuSCIMClient {
 	}
 	
 	private String getUserJsonRequest(GluuSCIMUser user) throws GluuSCIMConnectorException {
-		String[] schemas = null;
-		if (user.getEntitlements() != null && !user.getEntitlements().isEmpty()) {
-			schemas = new String[]{USER_CORE_SCHEMA, USER_EXTENSION_SCHEMA};
-		} else {
-			schemas = new String[]{USER_CORE_SCHEMA};
-		}
-		
-		ObjectNode entitlementsJson = JSON_OBJECT_MAPPER.createObjectNode();
-		
-		for (GluuSCIMEntitlement entitlement : user.getEntitlements()) {
-			
-			ObjectNode productSubNode = JSON_OBJECT_MAPPER.createObjectNode();
-			productSubNode.put(PRODUCT, "Print + Web");
-			productSubNode.put(ENTITLEMENT_START_DATE, "1469051438");
-			productSubNode.put(ENTITLEMENT_END_DATE, "1500508800");
-			
-			ObjectNode productNode = JSON_OBJECT_MAPPER.createObjectNode();
-			productNode.put(entitlement.getProductName(), productSubNode);
-			
-			ArrayNode productMainNode = JSON_OBJECT_MAPPER.createArrayNode();
-			productMainNode.add(productNode.toString());
-			
-			entitlementsJson.put(entitlement.getProductCode(), productMainNode);
-		}
-		
 		GluuSCIMUserNameJsonObject name = new GluuSCIMUserNameJsonObject();
 		name.setFamilyName(user.getLastName());
 		name.setGivenName(user.getFirstName());
 		
 		GluuSCIMUserJsonRequest request = new GluuSCIMUserJsonRequest();
-		request.setSchemas(schemas);
+		request.setSchemas(getSchemasArray(user));
 		request.setUserName(user.getEmail());
 		request.setName(name);
 		request.setDisplayName(user.getDisplayName());
 		request.setPassword(user.getPassword());
-		request.setUserExtension(entitlementsJson);
+		request.setUserExtension(getUserEntitlementsJson(user));
 
 		String jsonRequest = null;
 		try {
@@ -368,6 +341,39 @@ public class GluuSCIMClient {
 			throw new GluuSCIMConnectorException(e1.getMessage());
 		}
 		return jsonRequest;
+	}
+
+	private String[] getSchemasArray(GluuSCIMUser user) {
+		String[] schemas = null;
+		if (user.hasEntitlements()) {
+			schemas = new String[]{USER_CORE_SCHEMA, USER_EXTENSION_SCHEMA};
+		} else {
+			schemas = new String[]{USER_CORE_SCHEMA};
+		}
+		return schemas;
+	}
+
+	private ObjectNode getUserEntitlementsJson(GluuSCIMUser user) {
+		ObjectNode entitlementsJson = JSON_OBJECT_MAPPER.createObjectNode();
+		
+		if(user.hasEntitlements()){
+			for (GluuSCIMEntitlement entitlement : user.getEntitlements()) {
+				
+				ObjectNode productSubNode = JSON_OBJECT_MAPPER.createObjectNode();
+				productSubNode.put(PRODUCT, entitlement.getProductName());
+				productSubNode.put(ENTITLEMENT_START_DATE, entitlement.getStartDate());
+				productSubNode.put(ENTITLEMENT_END_DATE, entitlement.getEndDate());
+				
+				ObjectNode productNode = JSON_OBJECT_MAPPER.createObjectNode();
+				productNode.set(entitlement.getProductName(), productSubNode);
+				
+				ArrayNode productMainNode = JSON_OBJECT_MAPPER.createArrayNode();
+				productMainNode.add(productNode.toString());
+				
+				entitlementsJson.set(entitlement.getProductCode(), productMainNode);
+			}
+		}
+		return entitlementsJson;
 	}
 	
 	

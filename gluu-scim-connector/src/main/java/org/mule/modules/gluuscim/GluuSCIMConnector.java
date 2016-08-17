@@ -1,21 +1,15 @@
 package org.mule.modules.gluuscim;
 
-import java.util.List;
-
 import org.mule.api.MuleEvent;
 import org.mule.api.annotations.Config;
 import org.mule.api.annotations.Connector;
 import org.mule.api.annotations.Processor;
 import org.mule.api.annotations.lifecycle.Start;
-import org.mule.api.annotations.param.Optional;
 import org.mule.modules.gluuscim.client.GluuSCIMClient;
 import org.mule.modules.gluuscim.config.GluuSCIMConnectorConfig;
-import org.mule.modules.gluuscim.entities.GluuSCIMEntitlement;
 import org.mule.modules.gluuscim.entities.GluuSCIMUser;
 import org.mule.modules.gluuscim.exception.GluuSCIMConnectorException;
 import org.mule.modules.gluuscim.exception.GluuSCIMServerErrorException;
-
-import com.fasterxml.jackson.databind.JsonNode;
 
 @Connector(name="gluu-scim", friendlyName="GluuSCIM")
 public class GluuSCIMConnector {

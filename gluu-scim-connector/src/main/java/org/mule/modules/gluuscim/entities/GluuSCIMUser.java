@@ -60,4 +60,8 @@ public class GluuSCIMUser implements Serializable {
 		this.entitlements = entitlements;
 	}
 	
+	public boolean hasEntitlements(){
+		return this.getEntitlements() != null && !this.getEntitlements().isEmpty();
+	}
+	
 }

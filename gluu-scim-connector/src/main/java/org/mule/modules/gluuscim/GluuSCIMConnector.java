@@ -11,6 +11,8 @@ import org.mule.modules.gluuscim.entities.GluuSCIMUser;
 import org.mule.modules.gluuscim.exception.GluuSCIMConnectorException;
 import org.mule.modules.gluuscim.exception.GluuSCIMServerErrorException;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
 @Connector(name="gluu-scim", friendlyName="GluuSCIM")
 public class GluuSCIMConnector {
 
@@ -35,7 +37,7 @@ public class GluuSCIMConnector {
      * @throws GluuSCIMServerErrorException 
      */
     @Processor
-    public String getUser(MuleEvent event, String attribute, String value) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
+    public GluuSCIMUser getUser(MuleEvent event, String attribute, String value) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
         return client.getUser(event, attribute, value);
     }
     
@@ -47,7 +49,7 @@ public class GluuSCIMConnector {
      * @throws GluuSCIMServerErrorException 
      */
     @Processor
-    public String createUser(MuleEvent event, GluuSCIMUser user) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
+    public GluuSCIMUser createUser(MuleEvent event, GluuSCIMUser user) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
         return client.createUser(event, user);
     }
     
@@ -59,7 +61,7 @@ public class GluuSCIMConnector {
      * @throws GluuSCIMServerErrorException 
      */
     @Processor
-    public String updateUser(MuleEvent event, GluuSCIMUser user) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
+    public GluuSCIMUser updateUser(MuleEvent event, GluuSCIMUser user) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
         return client.updateUser(event, user);
     }
 

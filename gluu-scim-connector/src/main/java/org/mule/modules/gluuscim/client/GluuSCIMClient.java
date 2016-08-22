@@ -2,6 +2,7 @@ package org.mule.modules.gluuscim.client;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +34,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.RequestMethod;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -101,7 +103,7 @@ public class GluuSCIMClient {
 	}
 	
 	/** Returns response from the get user call */
-	public String getUser(MuleEvent event /*TestObjectStore objectStore*/, String attribute, String value) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
+	public GluuSCIMUser getUser(MuleEvent event /*TestObjectStore objectStore*/, String attribute, String value) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
 		this.objectStore = event.getMuleContext().getRegistry().lookupObject(DEFAULT_USER_OBJECT_STORE);
 //		this.objectStore = objectStore;
 		
@@ -121,17 +123,20 @@ public class GluuSCIMClient {
 		System.out.println(String.format("Sending request to %s with authorized SCIM token %s in header", apiResource + "/" + SEARCH_USER, authorizedScimToken));
 		LOGGER.info(String.format("Sending request to %s with authorized SCIM token %s in header", apiResource + "/" + SEARCH_USER, authorizedScimToken));
 		
-		return getValidatedResponse(apiResource
+		String validatedResponse = getValidatedResponse(apiResource
 				.path(SEARCH_USER)
 				.accept(MediaType.APPLICATION_JSON)
 				.header(CONTENT_TYPE, MediaType.APPLICATION_JSON)
 				.header(AUTHORIZATION, authorizedScimToken)
 				.type(MediaType.APPLICATION_JSON)
 				.post(ClientResponse.class, jsonRequest));
+		
+		return mapResponseJsonToUserObject(validatedResponse);
+		
 	}
-	
+
 	/** Returns response from the create user call */
-	public String createUser(MuleEvent event /*TestObjectStore objectStore*/, GluuSCIMUser user) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
+	public GluuSCIMUser createUser(MuleEvent event /*TestObjectStore objectStore*/, GluuSCIMUser user) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
 		this.objectStore = event.getMuleContext().getRegistry().lookupObject(DEFAULT_USER_OBJECT_STORE);
 //		this.objectStore = objectStore;
 		
@@ -143,17 +148,18 @@ public class GluuSCIMClient {
 		System.out.println(String.format("Sending request to %s with authorized SCIM token %s in header", apiResource + "/" + USER_ENDPOINT, authorizedScimToken));
 		LOGGER.info(String.format("Sending request to %s with authorized SCIM token %s in header", apiResource + "/" + USER_ENDPOINT, authorizedScimToken));
 		
-		return getValidatedResponse(apiResource
+		String validatedResponse = getValidatedResponse(apiResource
 				.path(USER_ENDPOINT)
 				.accept(MediaType.APPLICATION_JSON)
 				.header(CONTENT_TYPE, MediaType.APPLICATION_JSON)
 				.header(AUTHORIZATION, authorizedScimToken)
 				.post(ClientResponse.class, jsonRequest));
 		
+		return mapResponseJsonToUserObject(validatedResponse);
 	}
 
 	/** Returns response from the update user call */
-	public String updateUser(MuleEvent event /*TestObjectStore objectStore*/, GluuSCIMUser user) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
+	public GluuSCIMUser updateUser(MuleEvent event /*TestObjectStore objectStore*/, GluuSCIMUser user) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
 		this.objectStore = event.getMuleContext().getRegistry().lookupObject(DEFAULT_USER_OBJECT_STORE);
 //		this.objectStore = objectStore;
 		
@@ -165,12 +171,14 @@ public class GluuSCIMClient {
 		System.out.println(String.format("Sending request to %s with authorized SCIM token %s in header", apiResource + "/" + url, authorizedScimToken));
 		LOGGER.info(String.format("Sending request to %s with authorized SCIM token %s in header", apiResource + "/" + url, authorizedScimToken));
 		
-		return getValidatedResponse(apiResource
+		String validatedResponse = getValidatedResponse(apiResource
 				.path(url)
 				.accept(MediaType.APPLICATION_JSON)
 				.header(CONTENT_TYPE, MediaType.APPLICATION_JSON)
 				.header(AUTHORIZATION, authorizedScimToken)
 				.put(ClientResponse.class, jsonRequest));
+		
+		return mapResponseJsonToUserObject(validatedResponse);
 	}
 
 
@@ -342,7 +350,7 @@ public class GluuSCIMClient {
 		}
 		return jsonRequest;
 	}
-
+	
 	private String[] getSchemasArray(GluuSCIMUser user) {
 		String[] schemas = null;
 		if (user.hasEntitlements()) {
@@ -376,6 +384,32 @@ public class GluuSCIMClient {
 		return entitlementsJson;
 	}
 	
+	private GluuSCIMUser mapResponseJsonToUserObject(String validatedResponse) throws GluuSCIMConnectorException {
+		GluuSCIMUser user = null;
+		
+		try {
+			JsonNode jsonResponse = JSON_OBJECT_MAPPER.readTree(validatedResponse);
+			user = new GluuSCIMUser();
+			
+			user.setDisplayName(jsonResponse.get("displayName").asText());		
+			user.setGluuId(jsonResponse.get("id").asText());
+			user.setEmail(jsonResponse.get("userName").asText());
+			user.setPassword(jsonResponse.get("password").asText());
+			
+			if(jsonResponse.get(USER_EXTENSION_SCHEMA) != null){
+				user.setEntitlements(Arrays.asList(JSON_OBJECT_MAPPER.readValue(jsonResponse.get(USER_EXTENSION_SCHEMA).asText(), GluuSCIMEntitlement[].class)));
+			}
+
+			JsonNode jsonNameNode = jsonResponse.get("name");
+			user.setFirstName(jsonNameNode.get("givenName").asText());
+			user.setLastName(jsonNameNode.get("familyName").asText());
+		
+		} catch (IOException e) {
+			throw new GluuSCIMConnectorException(e.getMessage());
+		}
+		
+		return user;
+	}
 	
 	/** Returns the response string in case of valid response or throws an exception in case of invalid response */
 	private String getValidatedResponse(ClientResponse clientResponse) throws GluuSCIMConnectorException, GluuSCIMServerErrorException {

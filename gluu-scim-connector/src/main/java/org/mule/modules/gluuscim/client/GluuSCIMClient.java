@@ -2,8 +2,9 @@ package org.mule.modules.gluuscim.client;
 
 import java.io.IOException;
 import java.io.Serializable;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -55,9 +56,6 @@ import com.sun.jersey.core.util.MultivaluedMapImpl;
 
 public class GluuSCIMClient {
 
-	private static final String ENTITLEMENT_END_DATE = "entitlementEndDate";
-	private static final String ENTITLEMENT_START_DATE = "entitlementStartDate";
-	private static final String PRODUCT = "product";
 	private static final String GET_AAT_TOKEN = "oxauth/seam/resource/restv1/oxauth/token";
 	private static final String GET_SCIM_TOKEN = "oxauth/seam/resource/restv1/requester/rpt";
 	private static final String AUTHORIZE_SCIM_TOKEN = "oxauth/seam/resource/restv1/requester/perm";
@@ -67,13 +65,17 @@ public class GluuSCIMClient {
 	private static final String AAT_TOKEN = "aatToken";
 	private static final String AAT_REFRESH_TOKEN = "aatRefreshToken";
 	private static final String AUTHORIZATION = "Authorization";
+	private static final String CONTENT_TYPE = "Content-Type";
 	private static final String BEARER = "Bearer ";
 	private static final String BASIC = "Basic ";
 	
 	private static final String USER_EXTENSION_SCHEMA = "urn:ietf:params:scim:schemas:extension:gluu:2.0:User";
 	private static final String USER_CORE_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:User";
+	private static final String PRODUCT = "product";
+	private static final String ENTITLEMENT_START_DATE = "entitlementStartDate";
+	private static final String ENTITLEMENT_END_DATE = "entitlementEndDate";
+	
 	private static final String DEFAULT_USER_OBJECT_STORE = "_defaultUserObjectStore";
-	private static final String CONTENT_TYPE = "Content-Type";
 
 	private static final ObjectMapper JSON_OBJECT_MAPPER = new ObjectMapper();
 	private transient final Logger LOGGER = LoggerFactory.getLogger(this.getClass());
@@ -379,6 +381,7 @@ public class GluuSCIMClient {
 				productMainNode.add(productNode.toString());
 				
 				entitlementsJson.set(entitlement.getProductCode(), productMainNode);
+				
 			}
 		}
 		return entitlementsJson;
@@ -396,8 +399,29 @@ public class GluuSCIMClient {
 			user.setEmail(jsonResponse.get("userName").asText());
 			user.setPassword(jsonResponse.get("password").asText());
 			
+			
 			if(jsonResponse.get(USER_EXTENSION_SCHEMA) != null){
-				user.setEntitlements(Arrays.asList(JSON_OBJECT_MAPPER.readValue(jsonResponse.get(USER_EXTENSION_SCHEMA).asText(), GluuSCIMEntitlement[].class)));
+				List<GluuSCIMEntitlement> entitlements = new ArrayList<GluuSCIMEntitlement>();
+				
+				String entitlementsString = jsonResponse.get(USER_EXTENSION_SCHEMA).toString();
+				entitlementsString = entitlementsString.replace("\"{", "{");
+				entitlementsString = entitlementsString.replace("}\"", "}");
+				entitlementsString = entitlementsString.replace("\\\"", "\"");
+				
+				Iterator<Entry<String, JsonNode>> entitlementsFieldsIterator = JSON_OBJECT_MAPPER.readTree(entitlementsString).fields();
+				for (Iterator<Entry<String, JsonNode>> fields = entitlementsFieldsIterator; fields.hasNext();) {
+					Entry<String, JsonNode> field = fields.next();
+					JsonNode fieldValue = field.getValue().get(0).fields().next().getValue();
+					
+					GluuSCIMEntitlement entitlement = new GluuSCIMEntitlement();
+					entitlement.setProductCode(field.getKey());
+					entitlement.setProductName(fieldValue.get(PRODUCT).asText());
+					entitlement.setStartDate(fieldValue.get(ENTITLEMENT_START_DATE).asText());
+					entitlement.setEndDate(fieldValue.get(ENTITLEMENT_END_DATE).asText());
+					
+					entitlements.add(entitlement);
+				}
+				user.setEntitlements(entitlements);
 			}
 
 			JsonNode jsonNameNode = jsonResponse.get("name");
@@ -476,6 +500,27 @@ public class GluuSCIMClient {
 		entitlements.put("printPlusWeb", printPlusWebMainNode);
 		
 //		System.out.println(client.updateUser(client.new TestObjectStore(), "@!E0E2.8150.B9D2.14A0!0001!6A42.EB0A!0000!C9A3.6E92", "Tina", "Turner", "fancydisplayName", "email44@test.com_edited", "password55_edited", entitlements));
+	
+	
+		String jsonResponse = "{\"printPlusWeb\":[{\"Print + Web\":{\"product\":\"Print + Web\",\"entitlementStartDate\":\"1469051438\",\"entitlementEndDate\":\"1500508800\"}}], \"printPlusDigital\":[{\"Print + Digital\":{\"product\":\"Print + Digital\",\"entitlementStartDate\":\"1469051438\",\"entitlementEndDate\":\"1500508800\"}}]}";
+
+		
+		try {
+			Iterator<Entry<String, JsonNode>> fieldsIterator = JSON_OBJECT_MAPPER.readTree(jsonResponse).fields();
+			for (Iterator<Entry<String, JsonNode>> fields = fieldsIterator; fields.hasNext();) {
+				Entry<String, JsonNode> field = fields.next();
+				JsonNode fieldValue = field.getValue().get(0).fields().next().getValue();
+				
+				GluuSCIMEntitlement entitlement = new GluuSCIMEntitlement();
+				entitlement.setProductCode(field.getKey());
+				entitlement.setProductName(fieldValue.get(PRODUCT).asText());
+				entitlement.setStartDate(fieldValue.get(ENTITLEMENT_START_DATE).asText());
+				entitlement.setEndDate(fieldValue.get(ENTITLEMENT_END_DATE).asText());
+			}
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 	
 	public class TestObjectStore {

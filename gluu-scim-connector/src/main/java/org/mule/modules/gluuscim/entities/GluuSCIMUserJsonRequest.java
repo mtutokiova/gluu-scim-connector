@@ -6,6 +6,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 @JsonInclude(Include.NON_NULL)
 public class GluuSCIMUserJsonRequest implements Serializable{
@@ -14,6 +15,9 @@ public class GluuSCIMUserJsonRequest implements Serializable{
 
 	@JsonProperty(value="schemas")
 	private String[] schemas;
+	
+	@JsonProperty(value="id")
+	private String id;
 	
 	@JsonProperty(value="userName")
 	private String userName;
@@ -28,7 +32,7 @@ public class GluuSCIMUserJsonRequest implements Serializable{
 	private String password;
 	
 	@JsonProperty(value="urn:ietf:params:scim:schemas:extension:gluu:2.0:User")
-	private JsonNode userExtension;
+	private ObjectNode userExtension;
 
 	public String[] getSchemas() {
 		return schemas;
@@ -38,11 +42,19 @@ public class GluuSCIMUserJsonRequest implements Serializable{
 		this.schemas = schemas;
 	}
 
-	public JsonNode getUserExtension() {
+	public String getId() {
+		return id;
+	}
+
+	public void setId(String id) {
+		this.id = id;
+	}
+
+	public ObjectNode getUserExtension() {
 		return userExtension;
 	}
 
-	public void setUserExtension(JsonNode userExtension) {
+	public void setUserExtension(ObjectNode userExtension) {
 		this.userExtension = userExtension;
 	}
 

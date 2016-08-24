@@ -74,6 +74,9 @@ public class GluuSCIMClient {
 	private static final String PRODUCT = "product";
 	private static final String ENTITLEMENT_START_DATE = "entitlementStartDate";
 	private static final String ENTITLEMENT_END_DATE = "entitlementEndDate";
+	private static final String FAMILY_NAME = "familyName";
+	private static final String GIVEN_NAME = "givenName";
+	private static final String NAME = "name";
 	
 	private static final String DEFAULT_USER_OBJECT_STORE = "_defaultUserObjectStore";
 
@@ -122,7 +125,6 @@ public class GluuSCIMClient {
 		
 		String authorizedScimToken = obtainToken(RequestMethod.POST, SEARCH_USER, jsonRequest);
 		
-		System.out.println(String.format("Sending request to %s with authorized SCIM token %s in header", apiResource + "/" + SEARCH_USER, authorizedScimToken));
 		LOGGER.info(String.format("Sending request to %s with authorized SCIM token %s in header", apiResource + "/" + SEARCH_USER, authorizedScimToken));
 		
 		String validatedResponse = getValidatedResponse(apiResource
@@ -143,11 +145,8 @@ public class GluuSCIMClient {
 //		this.objectStore = objectStore;
 		
 		String jsonRequest = getUserJsonRequest(user);
-		
-		
 		String authorizedScimToken = obtainToken(RequestMethod.POST, USER_ENDPOINT, jsonRequest);
 		
-		System.out.println(String.format("Sending request to %s with authorized SCIM token %s in header", apiResource + "/" + USER_ENDPOINT, authorizedScimToken));
 		LOGGER.info(String.format("Sending request to %s with authorized SCIM token %s in header", apiResource + "/" + USER_ENDPOINT, authorizedScimToken));
 		
 		String validatedResponse = getValidatedResponse(apiResource
@@ -170,7 +169,6 @@ public class GluuSCIMClient {
 		String jsonRequest = getUserJsonRequest(user);
 		String authorizedScimToken = obtainToken(RequestMethod.PUT, url, jsonRequest);
 		
-		System.out.println(String.format("Sending request to %s with authorized SCIM token %s in header", apiResource + "/" + url, authorizedScimToken));
 		LOGGER.info(String.format("Sending request to %s with authorized SCIM token %s in header", apiResource + "/" + url, authorizedScimToken));
 		
 		String validatedResponse = getValidatedResponse(apiResource
@@ -424,9 +422,9 @@ public class GluuSCIMClient {
 				user.setEntitlements(entitlements);
 			}
 
-			JsonNode jsonNameNode = jsonResponse.get("name");
-			user.setFirstName(jsonNameNode.get("givenName").asText());
-			user.setLastName(jsonNameNode.get("familyName").asText());
+			JsonNode jsonNameNode = jsonResponse.get(NAME);
+			user.setFirstName(jsonNameNode.get(GIVEN_NAME).asText());
+			user.setLastName(jsonNameNode.get(FAMILY_NAME).asText());
 		
 		} catch (IOException e) {
 			throw new GluuSCIMConnectorException(e.getMessage());
@@ -440,7 +438,6 @@ public class GluuSCIMClient {
 		String responseEntity = clientResponse.getEntity(String.class);
 		int responseStatus = clientResponse.getStatus();
 
-		System.out.println(String.format("Getting response with status %s: %s", responseStatus, responseEntity));
 		LOGGER.info(String.format("Getting response with status %s: %s", responseStatus, responseEntity));
 		
 		if(responseStatus == 500 ){
@@ -482,45 +479,7 @@ public class GluuSCIMClient {
 		connectorConfig.setPassword("5ab8e319-b4d4-4808-b06d-583bb109ca90");
 		connectorConfig.setRedirectUri("https://dev-economistapi.cloudhub.io");
 		
-		GluuSCIMClient client = new GluuSCIMClient(connectorConfig);
-//		System.out.println(client.getUser(client.new TestObjectStore(), "uid", "guest-ajamnssi@example.com"));
-		
-		ObjectNode printPlusWebSubNode = JSON_OBJECT_MAPPER.createObjectNode();
-		printPlusWebSubNode.put(PRODUCT, "Print + Web");
-		printPlusWebSubNode.put(ENTITLEMENT_START_DATE, "1469051438");
-		printPlusWebSubNode.put(ENTITLEMENT_END_DATE, "1500508800");
-		
-		ObjectNode printPlusWebNode = JSON_OBJECT_MAPPER.createObjectNode();
-		printPlusWebNode.put("Print + Web", printPlusWebSubNode);
-		
-		ArrayNode printPlusWebMainNode = JSON_OBJECT_MAPPER.createArrayNode();
-		printPlusWebMainNode.add(printPlusWebNode.toString());
-		
-		ObjectNode entitlements = JSON_OBJECT_MAPPER.createObjectNode();
-		entitlements.put("printPlusWeb", printPlusWebMainNode);
-		
-//		System.out.println(client.updateUser(client.new TestObjectStore(), "@!E0E2.8150.B9D2.14A0!0001!6A42.EB0A!0000!C9A3.6E92", "Tina", "Turner", "fancydisplayName", "email44@test.com_edited", "password55_edited", entitlements));
-	
-	
-		String jsonResponse = "{\"printPlusWeb\":[{\"Print + Web\":{\"product\":\"Print + Web\",\"entitlementStartDate\":\"1469051438\",\"entitlementEndDate\":\"1500508800\"}}], \"printPlusDigital\":[{\"Print + Digital\":{\"product\":\"Print + Digital\",\"entitlementStartDate\":\"1469051438\",\"entitlementEndDate\":\"1500508800\"}}]}";
-
-		
-		try {
-			Iterator<Entry<String, JsonNode>> fieldsIterator = JSON_OBJECT_MAPPER.readTree(jsonResponse).fields();
-			for (Iterator<Entry<String, JsonNode>> fields = fieldsIterator; fields.hasNext();) {
-				Entry<String, JsonNode> field = fields.next();
-				JsonNode fieldValue = field.getValue().get(0).fields().next().getValue();
-				
-				GluuSCIMEntitlement entitlement = new GluuSCIMEntitlement();
-				entitlement.setProductCode(field.getKey());
-				entitlement.setProductName(fieldValue.get(PRODUCT).asText());
-				entitlement.setStartDate(fieldValue.get(ENTITLEMENT_START_DATE).asText());
-				entitlement.setEndDate(fieldValue.get(ENTITLEMENT_END_DATE).asText());
-			}
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+//		GluuSCIMClient client = new GluuSCIMClient(connectorConfig);
 	}
 	
 	public class TestObjectStore {

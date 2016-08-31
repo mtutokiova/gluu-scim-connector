@@ -11,8 +11,6 @@ import org.mule.modules.gluuscim.entities.GluuSCIMUser;
 import org.mule.modules.gluuscim.exception.GluuSCIMConnectorException;
 import org.mule.modules.gluuscim.exception.GluuSCIMServerErrorException;
 
-import com.fasterxml.jackson.databind.JsonNode;
-
 @Connector(name="gluu-scim", friendlyName="GluuSCIM")
 public class GluuSCIMConnector {
 

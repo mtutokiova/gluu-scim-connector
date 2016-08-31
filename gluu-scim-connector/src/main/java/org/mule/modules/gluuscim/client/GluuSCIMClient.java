@@ -29,7 +29,7 @@ import org.mule.modules.gluuscim.entities.GluuSCIMUserJsonRequest;
 import org.mule.modules.gluuscim.entities.GluuSCIMUserNameJsonObject;
 import org.mule.modules.gluuscim.exception.GluuSCIMConnectorException;
 import org.mule.modules.gluuscim.exception.GluuSCIMServerErrorException;
-import org.mule.util.store.PartitionedPersistentObjectStore;
+import org.mule.util.store.PartitionedInMemoryObjectStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -78,7 +78,7 @@ public class GluuSCIMClient {
 	private static final String GIVEN_NAME = "givenName";
 	private static final String NAME = "name";
 	
-	private static final String DEFAULT_USER_OBJECT_STORE = "_defaultUserObjectStore";
+	private static final String DEFAULT_USER_OBJECT_STORE = "_defaultTransientUserObjectStore";
 
 	private static final ObjectMapper JSON_OBJECT_MAPPER = new ObjectMapper();
 	private transient final Logger LOGGER = LoggerFactory.getLogger(this.getClass());
@@ -90,7 +90,7 @@ public class GluuSCIMClient {
 	private final WebResource apiResource;
 	private final GluuSCIMConnectorConfig connectorConfig;
 
-	private PartitionedPersistentObjectStore<Serializable> objectStore;
+	private PartitionedInMemoryObjectStore<Serializable> objectStore;
 //	private TestObjectStore objectStore;
 	
 	/**
@@ -109,8 +109,15 @@ public class GluuSCIMClient {
 	
 	/** Returns response from the get user call */
 	public GluuSCIMUser getUser(MuleEvent event /*TestObjectStore objectStore*/, String attribute, String value) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
-		this.objectStore = event.getMuleContext().getRegistry().lookupObject(DEFAULT_USER_OBJECT_STORE);
-//		this.objectStore = objectStore;
+		LOGGER.info(String.format("Processing getUser search request for attribute %s and value %s", attribute, value));
+
+		//		this.objectStore = objectStore;
+		
+		try{
+			this.objectStore = event.getMuleContext().getRegistry().lookupObject(DEFAULT_USER_OBJECT_STORE);
+		} catch (Exception e) {
+			LOGGER.info("Exception in getting objectStore " + e);
+		}
 		
 		GluuSCIMGetUserJsonRequest request = new GluuSCIMGetUserJsonRequest();
 		request.setAttribute(attribute);
@@ -194,37 +201,34 @@ public class GluuSCIMClient {
 			refreshToken();
 		}
 		
-		String aatToken = null;
-		try {
-			aatToken = (String)objectStore.retrieve(AAT_TOKEN);
-		} catch (ObjectStoreException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+		String aatToken = getAatToken();
 		String scimToken = getScimToken(BEARER + aatToken);
 		String scimTicket = getScimTicket(requestMethod, url, BEARER + scimToken, jsonRequest);
 		
 		return BEARER + getAuthorizedScimToken(BEARER + aatToken, scimToken, scimTicket, getApiUrl());
 	}
+	
+	private String getAatToken() throws GluuSCIMConnectorException {
+		String aatRefreshToken = null;
+		try {
+			if(objectStore.contains(AAT_TOKEN)){
+				aatRefreshToken = (String)objectStore.retrieve(AAT_TOKEN);
+			}
+			else throw new GluuSCIMConnectorException("Exception in getting AAT Token");
+		} catch (ObjectStoreException e) {
+			throw new GluuSCIMConnectorException(e.getMessage());
+		}
+		return aatRefreshToken;
+	}
 
 	/** Do the "oxauth/seam/resource/restv1/oxauth/token" call */
 	private void refreshToken() throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
-		String aatRefreshToken = null;
-
-		try {
-			aatRefreshToken = objectStore.contains(AAT_REFRESH_TOKEN) ? (String)objectStore.retrieve(AAT_REFRESH_TOKEN) : connectorConfig.getAatRefreshToken();
-
-		} catch (ObjectStoreException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
-		
 		String authString = connectorConfig.getUsername() + ":" + connectorConfig.getPassword();
         String authStringEncrypted = BASIC + new String(Base64.encodeBase64(authString.getBytes()));
         
         MultivaluedMap<String, String> formData = new MultivaluedMapImpl();
 		formData.add("grant_type", "authorization_code");
-		formData.add("code", aatRefreshToken);
+		formData.add("code", getAatRefreshToken());
 		formData.add("redirect_uri", getRedirectUri());
 		
 		logInfo(apiResource + "/" + GET_AAT_TOKEN, authStringEncrypted, formData);
@@ -238,17 +242,27 @@ public class GluuSCIMClient {
 		try {
 			GluuSCIMGetAatTokenJsonResponse jsonResponse = JSON_OBJECT_MAPPER.readValue(responseString, GluuSCIMGetAatTokenJsonResponse.class);
 			AAT_TOKEN_EXPIRATION_TIME = System.currentTimeMillis()/1000 + jsonResponse.getExpirationTimeInSeconds();
-			objectStore.remove(AAT_TOKEN);
+			if(objectStore.contains(AAT_TOKEN)){
+				objectStore.remove(AAT_TOKEN);
+			}
 			objectStore.store(AAT_TOKEN, jsonResponse.getAatToken());
-			objectStore.remove(AAT_REFRESH_TOKEN);
+			if(objectStore.contains(AAT_REFRESH_TOKEN)){
+				objectStore.remove(AAT_REFRESH_TOKEN);
+			}
 			objectStore.store(AAT_REFRESH_TOKEN, jsonResponse.getAatRefreshToken());
-			
-		} catch (IOException e) {
+		} catch (IOException | ObjectStoreException e) {
 			throw new GluuSCIMConnectorException(e.getMessage());
-		} catch (ObjectStoreException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
 		}
+	}
+
+	private String getAatRefreshToken() throws GluuSCIMConnectorException {
+		String aatRefreshToken = null;
+		try {
+			aatRefreshToken = objectStore.contains(AAT_REFRESH_TOKEN) ? (String)objectStore.retrieve(AAT_REFRESH_TOKEN) : connectorConfig.getAatRefreshToken();
+		} catch (ObjectStoreException e) {
+			throw new GluuSCIMConnectorException(e.getMessage());
+		}
+		return aatRefreshToken;
 	}
 	
 	/** Returns response from the "oxauth/seam/resource/restv1/requester/rpt" call */
@@ -396,7 +410,6 @@ public class GluuSCIMClient {
 			user.setGluuId(jsonResponse.get("id").asText());
 			user.setEmail(jsonResponse.get("userName").asText());
 			user.setPassword(jsonResponse.get("password").asText());
-			
 			
 			if(jsonResponse.get(USER_EXTENSION_SCHEMA) != null){
 				List<GluuSCIMEntitlement> entitlements = new ArrayList<GluuSCIMEntitlement>();

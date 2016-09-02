@@ -109,83 +109,92 @@ public class GluuSCIMClient {
 	
 	/** Returns response from the get user call */
 	public GluuSCIMUser getUser(MuleEvent event /*TestObjectStore objectStore*/, String attribute, String value) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
-		LOGGER.info(String.format("Processing getUser search request for attribute %s and value %s", attribute, value));
-
-		//		this.objectStore = objectStore;
-		
 		try{
+			LOGGER.info(String.format("Processing getUser search request for attribute %s and value %s", attribute, value));
+			
 			this.objectStore = event.getMuleContext().getRegistry().lookupObject(DEFAULT_USER_OBJECT_STORE);
-		} catch (Exception e) {
-			LOGGER.info("Exception in getting objectStore " + e);
+//			this.objectStore = objectStore;
+			
+			GluuSCIMGetUserJsonRequest request = new GluuSCIMGetUserJsonRequest();
+			request.setAttribute(attribute);
+			request.setValue(value);
+			
+			String jsonRequest = null;
+			try {
+				jsonRequest = JSON_OBJECT_MAPPER.writeValueAsString(request);
+			} catch (JsonProcessingException e1) {
+				throw new GluuSCIMConnectorException(e1.getMessage());
+			}
+			
+			String authorizedScimToken = obtainToken(RequestMethod.POST, SEARCH_USER, jsonRequest);
+			
+			LOGGER.info(String.format("Sending request to %s with authorized SCIM token %s in header", apiResource + "/" + SEARCH_USER, authorizedScimToken));
+			
+			String validatedResponse = getValidatedResponse(apiResource
+					.path(SEARCH_USER)
+					.accept(MediaType.APPLICATION_JSON)
+					.header(CONTENT_TYPE, MediaType.APPLICATION_JSON)
+					.header(AUTHORIZATION, authorizedScimToken)
+					.type(MediaType.APPLICATION_JSON)
+					.post(ClientResponse.class, jsonRequest));
+			
+			return mapResponseJsonToUserObject(validatedResponse);
+		} catch (RuntimeException e){
+			throw new GluuSCIMConnectorException(e.getMessage());
 		}
-		
-		GluuSCIMGetUserJsonRequest request = new GluuSCIMGetUserJsonRequest();
-		request.setAttribute(attribute);
-		request.setValue(value);
-		
-		String jsonRequest = null;
-		try {
-			jsonRequest = JSON_OBJECT_MAPPER.writeValueAsString(request);
-		} catch (JsonProcessingException e1) {
-			throw new GluuSCIMConnectorException(e1.getMessage());
-		}
-		
-		String authorizedScimToken = obtainToken(RequestMethod.POST, SEARCH_USER, jsonRequest);
-		
-		LOGGER.info(String.format("Sending request to %s with authorized SCIM token %s in header", apiResource + "/" + SEARCH_USER, authorizedScimToken));
-		
-		String validatedResponse = getValidatedResponse(apiResource
-				.path(SEARCH_USER)
-				.accept(MediaType.APPLICATION_JSON)
-				.header(CONTENT_TYPE, MediaType.APPLICATION_JSON)
-				.header(AUTHORIZATION, authorizedScimToken)
-				.type(MediaType.APPLICATION_JSON)
-				.post(ClientResponse.class, jsonRequest));
-		
-		return mapResponseJsonToUserObject(validatedResponse);
 		
 	}
 
 	/** Returns response from the create user call */
 	public GluuSCIMUser createUser(MuleEvent event /*TestObjectStore objectStore*/, GluuSCIMUser user) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
-		this.objectStore = event.getMuleContext().getRegistry().lookupObject(DEFAULT_USER_OBJECT_STORE);
-//		this.objectStore = objectStore;
-		
-		String jsonRequest = getUserJsonRequest(user);
-		String authorizedScimToken = obtainToken(RequestMethod.POST, USER_ENDPOINT, jsonRequest);
-		
-		LOGGER.info(String.format("Sending request to %s with authorized SCIM token %s in header", apiResource + "/" + USER_ENDPOINT, authorizedScimToken));
-		
-		String validatedResponse = getValidatedResponse(apiResource
-				.path(USER_ENDPOINT)
-				.accept(MediaType.APPLICATION_JSON)
-				.header(CONTENT_TYPE, MediaType.APPLICATION_JSON)
-				.header(AUTHORIZATION, authorizedScimToken)
-				.post(ClientResponse.class, jsonRequest));
-		
-		return mapResponseJsonToUserObject(validatedResponse);
+		try{
+			
+			this.objectStore = event.getMuleContext().getRegistry().lookupObject(DEFAULT_USER_OBJECT_STORE);
+//			this.objectStore = objectStore;
+			
+			String jsonRequest = getUserJsonRequest(user);
+			String authorizedScimToken = obtainToken(RequestMethod.POST, USER_ENDPOINT, jsonRequest);
+			
+			LOGGER.info(String.format("Sending request to %s with authorized SCIM token %s in header", apiResource + "/" + USER_ENDPOINT, authorizedScimToken));
+			
+			String validatedResponse = getValidatedResponse(apiResource
+					.path(USER_ENDPOINT)
+					.accept(MediaType.APPLICATION_JSON)
+					.header(CONTENT_TYPE, MediaType.APPLICATION_JSON)
+					.header(AUTHORIZATION, authorizedScimToken)
+					.post(ClientResponse.class, jsonRequest));
+			
+			return mapResponseJsonToUserObject(validatedResponse);
+		} catch (RuntimeException e){
+			throw new GluuSCIMConnectorException(e.getMessage());
+		}
 	}
 
 	/** Returns response from the update user call */
 	public GluuSCIMUser updateUser(MuleEvent event /*TestObjectStore objectStore*/, GluuSCIMUser user) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
-		this.objectStore = event.getMuleContext().getRegistry().lookupObject(DEFAULT_USER_OBJECT_STORE);
-//		this.objectStore = objectStore;
-		
-		String url = USER_ENDPOINT + "/" + user.getGluuId();
-
-		String jsonRequest = getUserJsonRequest(user);
-		String authorizedScimToken = obtainToken(RequestMethod.PUT, url, jsonRequest);
-		
-		LOGGER.info(String.format("Sending request to %s with authorized SCIM token %s in header", apiResource + "/" + url, authorizedScimToken));
-		
-		String validatedResponse = getValidatedResponse(apiResource
-				.path(url)
-				.accept(MediaType.APPLICATION_JSON)
-				.header(CONTENT_TYPE, MediaType.APPLICATION_JSON)
-				.header(AUTHORIZATION, authorizedScimToken)
-				.put(ClientResponse.class, jsonRequest));
-		
-		return mapResponseJsonToUserObject(validatedResponse);
+		try{
+			
+			this.objectStore = event.getMuleContext().getRegistry().lookupObject(DEFAULT_USER_OBJECT_STORE);
+//			this.objectStore = objectStore;
+			
+			String url = USER_ENDPOINT + "/" + user.getGluuId();
+			
+			String jsonRequest = getUserJsonRequest(user);
+			String authorizedScimToken = obtainToken(RequestMethod.PUT, url, jsonRequest);
+			
+			LOGGER.info(String.format("Sending request to %s with authorized SCIM token %s in header", apiResource + "/" + url, authorizedScimToken));
+			
+			String validatedResponse = getValidatedResponse(apiResource
+					.path(url)
+					.accept(MediaType.APPLICATION_JSON)
+					.header(CONTENT_TYPE, MediaType.APPLICATION_JSON)
+					.header(AUTHORIZATION, authorizedScimToken)
+					.put(ClientResponse.class, jsonRequest));
+			
+			return mapResponseJsonToUserObject(validatedResponse);
+		} catch (RuntimeException e){
+			throw new GluuSCIMConnectorException(e.getMessage());
+		}
 	}
 
 

@@ -15,6 +15,7 @@ public class GluuSCIMUser implements Serializable {
 	private String email;
 	private String password;
 	private String gluuId;
+	private String legacyPassword;
 	private List<GluuSCIMEntitlement> entitlements;
 	
 	public String getFirstName() {
@@ -53,6 +54,13 @@ public class GluuSCIMUser implements Serializable {
 	public void setGluuId(String gluuId) {
 		this.gluuId = gluuId;
 	}
+	public String getLegacyPassword() {
+		return legacyPassword;
+	}
+	public void setLegacyPassword(String legacyPassword) {
+		this.legacyPassword = legacyPassword;
+	}
+
 	public List<GluuSCIMEntitlement> getEntitlements() {
 		return entitlements;
 	}
@@ -64,4 +72,12 @@ public class GluuSCIMUser implements Serializable {
 		return this.getEntitlements() != null && !this.getEntitlements().isEmpty();
 	}
 	
+	@Override
+	public String toString() {
+		return "GluuSCIMUser [firstName=" + firstName + ", lastName="
+				+ lastName + ", displayName=" + displayName + ", email="
+				+ email + ", password=" + password + ", gluuId=" + gluuId
+				+ ", entitlements=" + entitlements
+				+ "]";
+	}
 }

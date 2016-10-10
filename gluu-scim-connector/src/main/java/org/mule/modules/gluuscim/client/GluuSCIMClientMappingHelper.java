@@ -52,7 +52,7 @@ public class GluuSCIMClientMappingHelper {
 		request.setName(name);
 		request.setDisplayName(user.getDisplayName());
 		request.setPassword(user.getPassword());
-		request.setUserExtension(getUserEntitlementsJson(user));
+		request.setUserExtension(getCustomAttributesJson(user));
 
 		String jsonRequest = null;
 		try {
@@ -144,16 +144,16 @@ public class GluuSCIMClientMappingHelper {
 	
 	private static String[] getSchemasArray(GluuSCIMUser user) {
 		String[] schemas = null;
-//		if (user.hasEntitlements()) {
+		if (user.hasEntitlements() || (user.getLegacyPassword() != null && !user.getLegacyPassword().isEmpty())) {
 			schemas = new String[]{USER_CORE_SCHEMA, USER_EXTENSION_SCHEMA};
-//		} else {
-//			schemas = new String[]{USER_CORE_SCHEMA};
-//		}
+		} else {
+			schemas = new String[]{USER_CORE_SCHEMA};
+		}
 		return schemas;
 	}
 
-	private static ObjectNode getUserEntitlementsJson(GluuSCIMUser user) {
-		ObjectNode entitlementsJson = JSON_OBJECT_MAPPER.createObjectNode();
+	private static ObjectNode getCustomAttributesJson(GluuSCIMUser user) {
+		ObjectNode customAttributesJson = JSON_OBJECT_MAPPER.createObjectNode();
 		
 		if(user.hasEntitlements()){
 			for (GluuSCIMEntitlement entitlement : user.getEntitlements()) {
@@ -169,17 +169,11 @@ public class GluuSCIMClientMappingHelper {
 				ArrayNode productMainNode = JSON_OBJECT_MAPPER.createArrayNode();
 				productMainNode.add(productNode.toString());
 				
-				entitlementsJson.set(entitlement.getProductCode(), productMainNode);
+				customAttributesJson.set(entitlement.getProductCode(), productMainNode);
 			}
 		}
-//		entitlementsJson.put(ACCEPT_MAIL_FROM_DOTCOM, user.getAcceptMailFromDotcom());
-//		entitlementsJson.put(ACCEPT_MAIL_FROM_EIU, user.getAcceptMailFromEiu());
-//		entitlementsJson.put(ACCEPT_MAIL_FROM_GROUP, user.getAcceptMailFromGroup());
-//		entitlementsJson.put(CRNS, user.getCrns());
-//		entitlementsJson.put(DRUPAL_ID, user.getDrupalId());
-//		entitlementsJson.put(ISO_COUNTRY_ID, user.getIsoCountryId());
-//		entitlementsJson.put(LEGACY_PASSWORD, user.getLegacyPassword());
-		return entitlementsJson;
+		customAttributesJson.put(LEGACY_PASSWORD, user.getLegacyPassword());
+		return customAttributesJson;
 	}
 	
 }

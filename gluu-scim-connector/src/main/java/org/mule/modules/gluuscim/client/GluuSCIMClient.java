@@ -76,7 +76,6 @@ public class GluuSCIMClient {
 			LOGGER.info(String.format("Processing getUser search request for attribute %s and value %s", attribute, value));
 			
 			PartitionedInMemoryObjectStore<Serializable> objectStore = event.getMuleContext().getRegistry().lookupObject(DEFAULT_USER_OBJECT_STORE);
-//			this.objectStore = objectStore;
 			
 			GluuSCIMGetUserJsonRequest request = new GluuSCIMGetUserJsonRequest();
 			request.setAttribute(attribute);
@@ -109,10 +108,9 @@ public class GluuSCIMClient {
 	}
 
 	/** Returns response from the create user call */
-	public GluuSCIMUser createUser(/*MuleEvent event*/ TestObjectStore objectStore, GluuSCIMUser user) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
+	public GluuSCIMUser createUser(MuleEvent event/*TestObjectStore objectStore*/, GluuSCIMUser user) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
 		try{
-//			PartitionedInMemoryObjectStore<Serializable> objectStore = event.getMuleContext().getRegistry().lookupObject(DEFAULT_USER_OBJECT_STORE);
-//			this.objectStore = objectStore;
+			PartitionedInMemoryObjectStore<Serializable> objectStore = event.getMuleContext().getRegistry().lookupObject(DEFAULT_USER_OBJECT_STORE);
 			
 			String jsonRequest = GluuSCIMClientMappingHelper.mapToJsonRequest(user);
 			String authorizedScimToken = tokenHelper.obtainToken(objectStore, RequestMethod.POST, USER_ENDPOINT, jsonRequest);
@@ -137,7 +135,6 @@ public class GluuSCIMClient {
 		try{
 			
 			PartitionedInMemoryObjectStore<Serializable> objectStore = event.getMuleContext().getRegistry().lookupObject(DEFAULT_USER_OBJECT_STORE);
-//			this.objectStore = objectStore;
 			
 			String url = USER_ENDPOINT + "/" + user.getGluuId();
 			
@@ -166,40 +163,33 @@ public class GluuSCIMClient {
 	public static void main(String[] args) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
 		GluuSCIMConnectorConfig connectorConfig = new GluuSCIMConnectorConfig();
 		connectorConfig.setHost("idp.d.aws.economist.com");
-		connectorConfig.setAatRefreshToken("40851da3-46e8-4910-ba49-49db61a3f3e4");
+		connectorConfig.setAatRefreshToken("f0799352-6200-4e33-8c8d-c6aa7bff00cd");
 		connectorConfig.setUsername("@!E0E2.8150.B9D2.14A0!0001!6A42.EB0A!0008!C1BA.E22F");
 		connectorConfig.setPassword("5ab8e319-b4d4-4808-b06d-583bb109ca90");
 		connectorConfig.setRedirectUri("https://dev-economistapi.cloudhub.io");
 		
-		GluuSCIMClient client = new GluuSCIMClient(connectorConfig);
-//		testingExtraAttributes@gmail.com
-//		client.getUser(client.new TestObjectStore(), "uid", "martina.tutokiova+634@gmail.com");
+//		GluuSCIMClient client = new GluuSCIMClient(connectorConfig);
+//		client.getUser(client.new TestObjectStore(), "uid", "martina.tutokiova+07101@gmail.com");
 		
 		GluuSCIMUser user = new GluuSCIMUser();
-//		user.setAcceptMailFromDotcom("false");
-//		user.setAcceptMailFromEiu("false");
-//		user.setAcceptMailFromGroup("false");
-//		user.setCrns("crn1, crn2");
 		user.setDisplayName("Martina Tutokiova");
-//		user.setDrupalId("123");
-		user.setEmail("martina.tutokiova+642@gmail.com");
-		user.setFirstName("MartinaUpdate");
-		user.setLastName("Tutokiova");
-//		user.setIsoCountryId("isoCountryId");
-//		user.setLegacyPassword("legacyPassword");
-		user.setPassword("password");
-//		user.setGluuId("@!E0E2.8150.B9D2.14A0!0001!6A42.EB0A!0000!D80A.87B5");
+		user.setEmail("martina.tutokiova+07101@gmail.com");
+		user.setFirstName("Martina_updated");
+		user.setLastName("Tutokiova_updated");
+		user.setLegacyPassword("legacyPassword_update");
+		user.setPassword("password_update");
+		user.setGluuId("@!E0E2.8150.B9D2.14A0!0001!6A42.EB0A!0000!04F9.FD0A");
 		
 		List<GluuSCIMEntitlement> entitlements = new ArrayList<GluuSCIMEntitlement>();
 		GluuSCIMEntitlement entitlement = new GluuSCIMEntitlement();
-		entitlement.setEndDate("1400000000");
+		entitlement.setEndDate("1400000001");
 		entitlement.setProductCode("Digital");
 		entitlement.setProductName("Digital");
-		entitlement.setStartDate("15000000000");
+		entitlement.setStartDate("15000000001");
 		entitlements.add(entitlement);
 		user.setEntitlements(entitlements);
 //		client.updateUser(client.new TestObjectStore(), user);
-		client.createUser(client.new TestObjectStore(), user);
+//		client.createUser(client.new TestObjectStore(), user);
 	}
 	
 	public class TestObjectStore {

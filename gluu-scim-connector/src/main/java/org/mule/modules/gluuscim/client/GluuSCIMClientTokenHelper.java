@@ -10,8 +10,6 @@ import javax.ws.rs.core.MultivaluedMap;
 
 import org.apache.commons.codec.binary.Base64;
 import org.mule.api.store.ObjectStoreException;
-import org.mule.modules.gluuscim.client.GluuSCIMClient.TestObjectStore;
-//import org.mule.modules.gluuscim.client.GluuSCIMClient.TestObjectStore;
 import org.mule.modules.gluuscim.config.GluuSCIMConnectorConfig;
 import org.mule.modules.gluuscim.entities.GluuSCIMGetAatTokenJsonResponse;
 import org.mule.modules.gluuscim.entities.GluuSCIMGetAuthorizedTokenJsonRequest;
@@ -53,8 +51,8 @@ public class GluuSCIMClientTokenHelper {
 	private final String host;
 	private final WebResource apiResource;
 
-//	private PartitionedInMemoryObjectStore<Serializable> objectStore;
-	private TestObjectStore objectStore;
+	private PartitionedInMemoryObjectStore<Serializable> objectStore;
+//	private TestObjectStore objectStore;
 
 	private transient final Logger LOGGER = LoggerFactory.getLogger(this.getClass());
 	
@@ -65,7 +63,7 @@ public class GluuSCIMClientTokenHelper {
 	}
 
 	/** Do all the steps required to obtain a valid scim access token including refresh token if needed */
-	public String obtainToken(/*PartitionedInMemoryObjectStore<Serializable>*/TestObjectStore objectStore, RequestMethod requestMethod, String url, String jsonRequest) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
+	public String obtainToken(PartitionedInMemoryObjectStore<Serializable>/*TestObjectStore*/ objectStore, RequestMethod requestMethod, String url, String jsonRequest) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
 		this.objectStore = objectStore;
 		
 		// do refresh token a minute before token expires

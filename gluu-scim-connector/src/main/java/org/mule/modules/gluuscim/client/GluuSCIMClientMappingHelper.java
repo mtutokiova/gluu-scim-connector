@@ -2,8 +2,10 @@ package org.mule.modules.gluuscim.client;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 
 import org.mule.modules.gluuscim.entities.GluuSCIMEntitlement;
@@ -26,9 +28,10 @@ public class GluuSCIMClientMappingHelper {
 
 	private static final String USER_EXTENSION_SCHEMA = "urn:ietf:params:scim:schemas:extension:gluu:2.0:User";
 	private static final String USER_CORE_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:User";
-	private static final String PRODUCT = "product";
-	private static final String ENTITLEMENT_START_DATE = "entitlementStartDate";
-	private static final String ENTITLEMENT_END_DATE = "entitlementEndDate";
+	private static final String ENTITLEMENTS = "Entitlements";
+	private static final String PRODUCT = "Product";
+	private static final String ENTITLEMENT_START_DATE = "Start";
+	private static final String ENTITLEMENT_END_DATE = "End";
 	private static final String NAME = "name";
 	private static final String FAMILY_NAME = "familyName";
 	private static final String GIVEN_NAME = "givenName";
@@ -78,13 +81,16 @@ public class GluuSCIMClientMappingHelper {
 			if(jsonResponse.get(USER_EXTENSION_SCHEMA) != null){
 				List<GluuSCIMEntitlement> entitlements = new ArrayList<GluuSCIMEntitlement>();
 				
-				String entitlementsString = jsonResponse.get(USER_EXTENSION_SCHEMA).toString();
-				entitlementsString = entitlementsString.replace("\"{", "{");
-				entitlementsString = entitlementsString.replace("}\"", "}");
-				entitlementsString = entitlementsString.replace("\\\"", "\"");
+				String customAttributesString = jsonResponse.get(USER_EXTENSION_SCHEMA).toString();
+				customAttributesString = customAttributesString.replace("\\\"{", "{");
+				customAttributesString = customAttributesString.replace("\"{", "{");
+				customAttributesString = customAttributesString.replace("}\\\"", "}");
+				customAttributesString = customAttributesString.replace("}\"", "}");
+				customAttributesString = customAttributesString.replace("\\\\\"", "\"");
+				customAttributesString = customAttributesString.replace("\\\"", "\"");
 				
-				Iterator<Entry<String, JsonNode>> entitlementsFieldsIterator = JSON_OBJECT_MAPPER.readTree(entitlementsString).fields();
-				for (Iterator<Entry<String, JsonNode>> fields = entitlementsFieldsIterator; fields.hasNext();) {
+				Iterator<Entry<String, JsonNode>> customFieldsIterator = JSON_OBJECT_MAPPER.readTree(customAttributesString).fields();
+				for (Iterator<Entry<String, JsonNode>> fields = customFieldsIterator; fields.hasNext();) {
 					Entry<String, JsonNode> field = fields.next();
 					
 					if(field.getValue().isValueNode()){
@@ -98,14 +104,22 @@ public class GluuSCIMClientMappingHelper {
 							break;
 						}
 					} else {
-						JsonNode fieldValue = field.getValue().get(0).fields().next().getValue();
-						GluuSCIMEntitlement entitlement = new GluuSCIMEntitlement();
-						entitlement.setProductCode(field.getKey());
-						entitlement.setProductName(fieldValue.get(PRODUCT).asText());
-						entitlement.setStartDate(fieldValue.get(ENTITLEMENT_START_DATE).asText());
-						entitlement.setEndDate(fieldValue.get(ENTITLEMENT_END_DATE).asText());
+						JsonNode fieldValue = field.getValue().get(0);
+						String productType = fieldValue.get(PRODUCT).asText();
+
+						JsonNode entitlementsValue = JSON_OBJECT_MAPPER.readTree(fieldValue.get(ENTITLEMENTS).asText());
 						
-						entitlements.add(entitlement);
+						for (Iterator<JsonNode> entitlementsIterator = entitlementsValue.elements(); entitlementsIterator.hasNext();) {
+							JsonNode entitlementJson = entitlementsIterator.next();
+						
+							GluuSCIMEntitlement entitlement = new GluuSCIMEntitlement();
+							entitlement.setProductType(productType);
+							entitlement.setStartDate(entitlementJson.get(ENTITLEMENT_START_DATE).asText());
+							entitlement.setEndDate(entitlementJson.get(ENTITLEMENT_END_DATE).asText());
+							entitlement.setCanonicalId(entitlementJson.get(ID).asText());
+							
+							entitlements.add(entitlement);
+						}
 					}
 				}
 				user.setEntitlements(entitlements);
@@ -156,21 +170,42 @@ public class GluuSCIMClientMappingHelper {
 		ObjectNode customAttributesJson = JSON_OBJECT_MAPPER.createObjectNode();
 		
 		if(user.hasEntitlements()){
-			for (GluuSCIMEntitlement entitlement : user.getEntitlements()) {
-				
-				ObjectNode productSubNode = JSON_OBJECT_MAPPER.createObjectNode();
-				productSubNode.put(PRODUCT, entitlement.getProductName());
-				productSubNode.put(ENTITLEMENT_START_DATE, entitlement.getStartDate());
-				productSubNode.put(ENTITLEMENT_END_DATE, entitlement.getEndDate());
-				
+			Map<String, List<GluuSCIMEntitlement>> entitlementsMap = new HashMap<String, List<GluuSCIMEntitlement>>();
+			
+			// currently have only Digital and Web products, 
+			// however to support new product types in future, sorting them by product type first  
+			for (GluuSCIMEntitlement entitlement: user.getEntitlements()){
+				if(entitlementsMap.containsKey(entitlement.getProductType())){
+					entitlementsMap.get(entitlement.getProductType()).add(entitlement);
+				} else {
+					List<GluuSCIMEntitlement> entitlementsList = new ArrayList<GluuSCIMEntitlement>();
+					entitlementsList.add(entitlement);
+					entitlementsMap.put(entitlement.getProductType(), entitlementsList);
+				}
+			}
+			
+			for (String productType: entitlementsMap.keySet()) {
+
+				ArrayNode entitlementsMainNode = JSON_OBJECT_MAPPER.createArrayNode();
+				for (GluuSCIMEntitlement entitlement : entitlementsMap.get(productType)) {
+					
+					ObjectNode entitlementSubNode = JSON_OBJECT_MAPPER.createObjectNode();
+					entitlementSubNode.put(ID, entitlement.getCanonicalId());
+					entitlementSubNode.put(ENTITLEMENT_START_DATE, entitlement.getStartDate());
+					entitlementSubNode.put(ENTITLEMENT_END_DATE, entitlement.getEndDate());
+					
+					entitlementsMainNode.add(entitlementSubNode.toString());
+				}
 				ObjectNode productNode = JSON_OBJECT_MAPPER.createObjectNode();
-				productNode.set(entitlement.getProductName(), productSubNode);
-				
+				productNode.put(PRODUCT, productType);
+				productNode.set(ENTITLEMENTS, entitlementsMainNode);
+				ObjectNode productSubNode = JSON_OBJECT_MAPPER.createObjectNode();
+				productSubNode.set(productType, productNode);
 				ArrayNode productMainNode = JSON_OBJECT_MAPPER.createArrayNode();
 				productMainNode.add(productNode.toString());
-				
-				customAttributesJson.set(entitlement.getProductCode(), productMainNode);
+				customAttributesJson.set(productType, productMainNode);
 			}
+			
 		}
 		customAttributesJson.put(LEGACY_PASSWORD, user.getLegacyPassword());
 		return customAttributesJson;

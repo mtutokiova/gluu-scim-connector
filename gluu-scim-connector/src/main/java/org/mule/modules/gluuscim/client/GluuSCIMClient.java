@@ -71,11 +71,11 @@ public class GluuSCIMClient {
 	}
 	
 	/** Returns response from the get user call */
-	public GluuSCIMUser getUser(MuleEvent event/*TestObjectStore objectStore*/, String attribute, String value) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
+	public GluuSCIMUser getUser(/*MuleEvent event*/TestObjectStore objectStore, String attribute, String value) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
 		try{
 			LOGGER.info(String.format("Processing getUser search request for attribute %s and value %s", attribute, value));
 			
-			PartitionedInMemoryObjectStore<Serializable> objectStore = event.getMuleContext().getRegistry().lookupObject(DEFAULT_USER_OBJECT_STORE);
+//			PartitionedInMemoryObjectStore<Serializable> objectStore = event.getMuleContext().getRegistry().lookupObject(DEFAULT_USER_OBJECT_STORE);
 			
 			GluuSCIMGetUserJsonRequest request = new GluuSCIMGetUserJsonRequest();
 			request.setAttribute(attribute);
@@ -108,9 +108,9 @@ public class GluuSCIMClient {
 	}
 
 	/** Returns response from the create user call */
-	public GluuSCIMUser createUser(MuleEvent event/*TestObjectStore objectStore*/, GluuSCIMUser user) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
+	public GluuSCIMUser createUser(/*MuleEvent event*/TestObjectStore objectStore, GluuSCIMUser user) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
 		try{
-			PartitionedInMemoryObjectStore<Serializable> objectStore = event.getMuleContext().getRegistry().lookupObject(DEFAULT_USER_OBJECT_STORE);
+//			PartitionedInMemoryObjectStore<Serializable> objectStore = event.getMuleContext().getRegistry().lookupObject(DEFAULT_USER_OBJECT_STORE);
 			
 			String jsonRequest = GluuSCIMClientMappingHelper.mapToJsonRequest(user);
 			String authorizedScimToken = tokenHelper.obtainToken(objectStore, RequestMethod.POST, USER_ENDPOINT, jsonRequest);
@@ -131,10 +131,10 @@ public class GluuSCIMClient {
 	}
 
 	/** Returns response from the update user call */
-	public GluuSCIMUser updateUser(MuleEvent event/*TestObjectStore objectStore*/, GluuSCIMUser user) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
+	public GluuSCIMUser updateUser(/*MuleEvent event*/TestObjectStore objectStore, GluuSCIMUser user) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
 		try{
 			
-			PartitionedInMemoryObjectStore<Serializable> objectStore = event.getMuleContext().getRegistry().lookupObject(DEFAULT_USER_OBJECT_STORE);
+//			PartitionedInMemoryObjectStore<Serializable> objectStore = event.getMuleContext().getRegistry().lookupObject(DEFAULT_USER_OBJECT_STORE);
 			
 			String url = USER_ENDPOINT + "/" + user.getGluuId();
 			
@@ -163,29 +163,36 @@ public class GluuSCIMClient {
 	public static void main(String[] args) throws GluuSCIMServerErrorException, GluuSCIMConnectorException {
 		GluuSCIMConnectorConfig connectorConfig = new GluuSCIMConnectorConfig();
 		connectorConfig.setHost("idp.d.aws.economist.com");
-		connectorConfig.setAatRefreshToken("f0799352-6200-4e33-8c8d-c6aa7bff00cd");
+		connectorConfig.setAatRefreshToken("dcc5f578-9bb9-4157-b88e-c963879b7f1e");
 		connectorConfig.setUsername("@!E0E2.8150.B9D2.14A0!0001!6A42.EB0A!0008!C1BA.E22F");
 		connectorConfig.setPassword("5ab8e319-b4d4-4808-b06d-583bb109ca90");
 		connectorConfig.setRedirectUri("https://dev-economistapi.cloudhub.io");
 		
-//		GluuSCIMClient client = new GluuSCIMClient(connectorConfig);
-//		client.getUser(client.new TestObjectStore(), "uid", "martina.tutokiova+07101@gmail.com");
+		GluuSCIMClient client = new GluuSCIMClient(connectorConfig);
+		GluuSCIMUser response = client.getUser(client.new TestObjectStore(), "uid", "martina.tutokiova+101018@gmail.com");
 		
 		GluuSCIMUser user = new GluuSCIMUser();
 		user.setDisplayName("Martina Tutokiova");
-		user.setEmail("martina.tutokiova+07101@gmail.com");
-		user.setFirstName("Martina_updated");
-		user.setLastName("Tutokiova_updated");
-		user.setLegacyPassword("legacyPassword_update");
-		user.setPassword("password_update");
-		user.setGluuId("@!E0E2.8150.B9D2.14A0!0001!6A42.EB0A!0000!04F9.FD0A");
+		user.setEmail("martina.tutokiova+101018@gmail.com");
+		user.setFirstName("Martina");
+		user.setLastName("Tutokiova");
+		user.setLegacyPassword("legacyPassword");
+		user.setPassword("password");
+		user.setGluuId("@!E0E2.8150.B9D2.14A0!0001!6A42.EB0A!0000!7070.CB5E");
 		
 		List<GluuSCIMEntitlement> entitlements = new ArrayList<GluuSCIMEntitlement>();
 		GluuSCIMEntitlement entitlement = new GluuSCIMEntitlement();
 		entitlement.setEndDate("1400000001");
-		entitlement.setProductCode("Digital");
-		entitlement.setProductName("Digital");
+		entitlement.setProductType("Digital");
 		entitlement.setStartDate("15000000001");
+		entitlement.setCanonicalId("123456");
+		entitlements.add(entitlement);
+		
+		entitlement = new GluuSCIMEntitlement();
+		entitlement.setEndDate("1400000002");
+		entitlement.setProductType("Digital");
+		entitlement.setStartDate("15000000002");
+		entitlement.setCanonicalId("78910");
 		entitlements.add(entitlement);
 		user.setEntitlements(entitlements);
 //		client.updateUser(client.new TestObjectStore(), user);

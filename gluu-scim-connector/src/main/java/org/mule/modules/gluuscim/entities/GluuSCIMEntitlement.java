@@ -6,22 +6,16 @@ public class GluuSCIMEntitlement implements Serializable{
 	
 	private static final long serialVersionUID = -1125208405055001907L;
 
-	private String productName;
-	private String productCode;
+	private String productType;
 	private String startDate;
 	private String endDate;
+	private String canonicalId;
 	
-	public String getProductName() {
-		return productName;
+	public String getProductType() {
+		return productType;
 	}
-	public void setProductName(String productName) {
-		this.productName = productName;
-	}
-	public String getProductCode() {
-		return productCode;
-	}
-	public void setProductCode(String productCode) {
-		this.productCode = productCode;
+	public void setProductType(String productType) {
+		this.productType = productType;
 	}
 	public String getStartDate() {
 		return startDate;
@@ -34,6 +28,12 @@ public class GluuSCIMEntitlement implements Serializable{
 	}
 	public void setEndDate(String endDate) {
 		this.endDate = endDate;
+	}
+	public String getCanonicalId() {
+		return canonicalId;
+	}
+	public void setCanonicalId(String canonicalId) {
+		this.canonicalId = canonicalId;
 	}
 	
 }
